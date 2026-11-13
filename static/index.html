@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Txn Fee Sum</title>
+<style>
+  :root {
+    --bg: #e8e2d8;
+    --card: #fbf8f3;
+    --ink: #221c17;
+    --muted: #6e655c;
+    --line: #ddd4c7;
+    --accent: #b8431f;
+    --accent-ink: #fff8f4;
+    --good: #1d6b45;
+    --good-bg: #e5f4ec;
+    --out: #8a5a12;
+    --out-bg: #f8efd8;
+    --self: #3d4a66;
+    --self-bg: #e7ebf3;
+    --bad: #9f1239;
+    --warn-bg: #fbf3e4;
+    --shadow: 0 1px 0 rgba(34, 28, 23, 0.04), 0 16px 40px rgba(70, 48, 24, 0.06);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    min-height: 100vh;
+    color: var(--ink);
+    background:
+      radial-gradient(900px 420px at 0% -10%, #f7f1e7, transparent 55%),
+      var(--bg);
+    font: 15px/1.45 "Segoe UI", sans-serif;
+  }
+  button, input, select { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  .wrap { width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 28px 0 64px; }
+  header h1 { margin: 0 0 6px; font-size: 32px; letter-spacing: -0.04em; font-weight: 650; }
+  header p { margin: 0; max-width: 68ch; color: var(--muted); }
+  .panel {
+    margin-top: 22px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    box-shadow: var(--shadow);
+    padding: 18px;
+  }
+  .grid { display: grid; grid-template-columns: 1.4fr 0.8fr 0.8fr; gap: 12px; }
+  .span-2 { grid-column: span 2; }
+  .span-3 { grid-column: 1 / -1; }
+  label { display: block; }
+  label span, .lbl { display: block; margin-bottom: 6px; font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+  input, select {
+    width: 100%;
+    height: 40px;
+    padding: 0 12px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: #fff;
+  }
+  input:focus, select:focus { outline: 2px solid #e7b5a4; border-color: var(--accent); }
+  .end-row { display: flex; gap: 8px; }
+  .end-row input { flex: 1; }
+  .ghost, .primary, .texty {
+    height: 40px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: #fff;
+    padding: 0 14px;
+  }
+  .ghost:hover, .texty:hover { border-color: #c9bfb2; }
+  .primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 650; }
+  .primary:hover { background: #9d3819; }
+  .primary:disabled, .ghost:disabled, .texty:disabled { opacity: 0.55; cursor: default; }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .hint { margin: 8px 0 0; color: var(--muted); font-size: 13px; }
+  .key-row { display: flex; gap: 8px; }
+  .key-row input { flex: 1; }
+  .banner {
+    margin-top: 14px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: #fde8ea;
+    color: var(--bad);
+    border: 1px solid #f3c5cd;
+  }
+  .warn {
+    margin-top: 12px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: var(--warn-bg);
+    border: 1px solid #ead7b0;
+  }
+  .warn ul { margin: 6px 0 0; padding-left: 18px; }
+  .progress-label { margin: 0; font-size: 28px; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
+  .progress-sub { margin: 4px 0 12px; color: var(--muted); }
+  .track { height: 14px; border-radius: 999px; background: #efe7dc; overflow: hidden; border: 1px solid var(--line); }
+  .bar { height: 100%; width: 0; background: linear-gradient(90deg, #c4552a, #8d3116); transition: width 0.2s linear; }
+  .stats { display: grid; grid-template-columns: 180px 1fr 1fr; gap: 12px; }
+  .stat { padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
+  .stat b { display: block; margin-top: 4px; font-size: 22px; letter-spacing: -0.03em; font-weight: 650; font-variant-numeric: tabular-nums; word-break: break-all; }
+  .stat em { font-style: normal; color: var(--muted); font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; }
+  .result-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-end; margin-bottom: 12px; }
+  .result-head h2 { margin: 0; font-size: 18px; }
+  .meta { color: var(--muted); font-size: 13px; }
+  .tools { display: flex; gap: 8px; flex-wrap: wrap; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th, td { padding: 8px 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; white-space: nowrap; }
+  th { font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); font-weight: 650; }
+  th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; font-family: Consolas, "Cascadia Mono", "Segoe UI", monospace; }
+  tbody tr:hover { background: #f6f1e8; }
+  tr.failed { background: #fff5f6; }
+  .scroll { overflow-x: auto; }
+  a { color: #1d4e89; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .badge {
+    display: inline-flex; align-items: center; max-width: 132px;
+    padding: 3px 8px; border-radius: 7px; border: 1px solid var(--line);
+    background: #f3f0ea; overflow: hidden; text-overflow: ellipsis;
+  }
+  .dir { display: inline-block; min-width: 42px; text-align: center; padding: 2px 6px; border-radius: 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; }
+  .dir.in { color: var(--good); background: var(--good-bg); }
+  .dir.out { color: var(--out); background: var(--out-bg); }
+  .dir.self { color: var(--self); background: var(--self-bg); }
+  .fail { color: var(--bad); font-size: 11px; font-weight: 700; margin-left: 6px; }
+  .icon {
+    border: 0; background: transparent; color: var(--muted); padding: 0 4px; height: auto;
+  }
+  .icon:hover { color: var(--ink); }
+  .check { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
+  .check input { width: auto; height: auto; }
+  .section-title { margin: 18px 0 8px; font-size: 16px; }
+  .demo-flag { display: inline-block; margin-left: 8px; padding: 2px 8px; border-radius: 999px; background: var(--warn-bg); color: var(--out); font-size: 12px; }
+  @media (max-width: 860px) {
+    .grid, .stats { grid-template-columns: 1fr; }
+    .span-2, .span-3 { grid-column: auto; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Txn Fee Sum</h1>
+    <p>Adds the Etherscan Txn Fee column from a start block through an end block. Every fee is gas price × gas used, in wei, so the total matches Etherscan to the last digit. List cells use the same shortened decimals as the website. Hover a fee or amount for the full value.</p>
+  </header>
+
+  <form class="panel" id="form">
+    <div class="grid">
+      <label class="span-3">
+        <span>Address</span>
+        <input id="address" name="address" spellcheck="false" autocomplete="off" placeholder="0x…">
+      </label>
+      <label>
+        <span>Start block</span>
+        <input id="startBlock" inputmode="numeric" autocomplete="off" placeholder="26400000">
+      </label>
+      <label>
+        <span>End block</span>
+        <div class="end-row">
+          <input id="endBlock" inputmode="numeric" autocomplete="off" placeholder="latest">
+          <button class="ghost" type="button" id="latest">Latest</button>
+        </div>
+      </label>
+      <label>
+        <span>Direction</span>
+        <select id="direction">
+          <option value="all">All transactions</option>
+          <option value="out">Outgoing only — fees this address paid</option>
+          <option value="in">Incoming only</option>
+        </select>
+      </label>
+      <label>
+        <span>Max count</span>
+        <input id="maxCount" inputmode="numeric" value="5">
+      </label>
+      <label>
+        <span>Min count</span>
+        <input id="minCount" inputmode="numeric" value="3">
+      </label>
+      <label>
+        <span>API plan</span>
+        <select id="plan">
+          <option value="free">Free — 3 calls/sec, 1,000 rows</option>
+          <option value="lite">Lite — 5 calls/sec, 10,000 rows</option>
+          <option value="standard">Standard — 10 calls/sec, 10,000 rows</option>
+          <option value="advanced">Advanced — 20 calls/sec, 10,000 rows</option>
+          <option value="professional">Professional — 30 calls/sec, 10,000 rows</option>
+        </select>
+      </label>
+      <label class="span-3">
+        <span>Etherscan API key</span>
+        <div class="key-row">
+          <input id="apiKey" type="password" autocomplete="off" spellcheck="false" placeholder="Paste one or more keys">
+          <button class="ghost" type="button" id="showKey">Show</button>
+        </div>
+      </label>
+    </div>
+    <p class="hint">A free key is enough. Create one at <a href="https://etherscan.io/apidashboard" target="_blank" rel="noopener">etherscan.io/apidashboard</a>. Several keys, separated by spaces, are used in turn. The key stays in this browser. Historical blocks are cached on this PC, so the next identical run does not call Etherscan again. On the free plan, a few hundred thousand transactions usually take a couple of minutes.</p>
+    <p class="hint">Incoming rows are listed by Etherscan too, but that fee was paid by the sender. Choose outgoing when you want only the fees this address paid.</p>
+    <div class="actions" style="margin-top:14px">
+      <button class="primary" id="go" type="submit">Calculate</button>
+      <button class="ghost" id="preview" type="button">Preview sample</button>
+      <button class="texty" id="clear" type="button">Clear cache</button>
+    </div>
+    <div id="error" class="banner" hidden></div>
+  </form>
+
+  <section class="panel" id="progressPanel" hidden>
+    <p class="progress-label" id="progressLabel">Starting…</p>
+    <p class="progress-sub" id="progressSub">Contacting Etherscan</p>
+    <div class="track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="progressBar">
+      <div class="bar" id="bar"></div>
+    </div>
+  </section>
+
+  <section class="panel" id="results" hidden>
+    <div class="result-head">
+      <div>
+        <h2 id="resultTitle">Result</h2>
+        <div class="meta" id="resultMeta"></div>
+      </div>
+      <div class="tools">
+        <label class="check"><input type="checkbox" id="fullPrecision"> Show full precision</label>
+        <button class="ghost" type="button" id="copySummary">Copy summary</button>
+        <button class="ghost" type="button" id="download">Download CSV</button>
+      </div>
+    </div>
+    <div class="stats">
+      <div class="stat"><em>Transactions</em><b id="statCount">0</b></div>
+      <div class="stat"><em>Exact fee sum</em><b id="statEth">0 ETH</b></div>
+      <div class="stat"><em>Exact fee sum in wei</em><b id="statWei">0</b></div>
+    </div>
+    <p class="hint" id="sumNote"></p>
+    <div id="warnings"></div>
+    <h3 class="section-title" id="maxTitle">Highest fees</h3>
+    <div class="scroll" id="maxTable"></div>
+    <h3 class="section-title" id="minTitle">Lowest fees</h3>
+    <div class="scroll" id="minTable"></div>
+  </section>
+</div>
+<script>
+const $ = (id) => document.getElementById(id);
+const fields = ["address", "startBlock", "endBlock", "maxCount", "minCount", "apiKey", "plan", "direction"];
+const storeKey = "txn-fee-sum-form";
+let controller = null;
+let lastResult = null;
+let showDate = false;
+let startedAt = 0;
+
+function loadForm() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(storeKey) || "{}");
+    for (const id of fields) if (saved[id] != null) $(id).value = saved[id];
+  } catch (err) { /* ignore broken local storage */ }
+}
+function saveForm() {
+  const data = {};
+  for (const id of fields) data[id] = $(id).value;
+  localStorage.setItem(storeKey, JSON.stringify(data));
+}
+loadForm();
+for (const id of fields) $(id).addEventListener("change", saveForm);
+for (const id of ["address", "startBlock", "endBlock", "maxCount", "minCount", "apiKey"]) {
+  $(id).addEventListener("input", saveForm);
+}
+
+$("showKey").addEventListener("click", () => {
+  const input = $("apiKey");
+  const show = input.type === "password";
+  input.type = show ? "text" : "password";
+  $("showKey").textContent = show ? "Hide" : "Show";
+});
+
+$("latest").addEventListener("click", async () => {
+  $("latest").disabled = true;
+  $("latest").textContent = "…";
+  try {
+    const response = await fetch("/api/head");
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.error || "Could not read the latest block.");
+    $("endBlock").value = String(body.block);
+    saveForm();
+    showError("");
+  } catch (err) {
+    showError(err.message);
+  } finally {
+    $("latest").disabled = false;
+    $("latest").textContent = "Latest";
+  }
+});
+
+$("clear").addEventListener("click", async () => {
+  if (!confirm("Clear the local transaction cache on this PC?")) return;
+  const response = await fetch("/api/cache/clear", { method: "POST", body: "{}" });
+  const body = await response.json();
+  if (!response.ok) showError(body.error || "Could not clear the cache.");
+  else showError("");
+});
+
+$("form").addEventListener("submit", (event) => {
+  event.preventDefault();
+  if (controller) {
+    controller.abort();
+    return;
+  }
+  const body = {
+    address: $("address").value.trim(),
+    startBlock: $("startBlock").value.trim(),
+    endBlock: $("endBlock").value.trim() || "latest",
+    maxCount: $("maxCount").value.trim(),
+    minCount: $("minCount").value.trim(),
+    apiKey: $("apiKey").value.trim(),
+    plan: $("plan").value,
+    direction: $("direction").value,
+  };
+  run(body);
+});
+
+$("preview").addEventListener("click", () => {
+  if (controller) return;
+  run({
+    demo: true,
+    maxCount: $("maxCount").value.trim() || "5",
+    minCount: $("minCount").value.trim() || "3",
+    direction: $("direction").value,
+  });
+});
+
+$("fullPrecision").addEventListener("change", () => { if (lastResult) render(lastResult); });
+$("copySummary").addEventListener("click", copySummary);
+$("download").addEventListener("click", downloadCsv);
+
+function fmt(n) { return new Intl.NumberFormat("en-US").format(n); }
+function showError(message) {
+  const box = $("error");
+  box.hidden = !message;
+  box.textContent = message || "";
+}
+
+async function run(body) {
+  showError("");
+  $("results").hidden = true;
+  $("progressPanel").hidden = false;
+  $("progressLabel").textContent = "Starting…";
+  $("progressSub").textContent = body.demo ? "Building the sample" : "Reading the chain";
+  $("bar").style.width = "0%";
+  $("progressBar").setAttribute("aria-valuenow", "0");
+  $("go").textContent = "Cancel";
+  $("preview").disabled = true;
+  $("clear").disabled = true;
+  startedAt = performance.now();
+  controller = new AbortController();
+  try {
+    const response = await fetch("/api/calculate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    const type = response.headers.get("content-type") || "";
+    if (type.includes("application/json")) {
+      const payload = await response.json();
+      throw new Error(payload.error || "The calculation failed.");
+    }
+    if (!response.ok || !response.body) throw new Error("The calculation failed.");
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    while (true) {
+      const step = await reader.read();
+      if (step.done) break;
+      buffer += decoder.decode(step.value, { stream: true });
+      let nl;
+      while ((nl = buffer.indexOf("\n")) >= 0) {
+        const line = buffer.slice(0, nl).trim();
+        buffer = buffer.slice(nl + 1);
+        if (!line) continue;
+        const msg = JSON.parse(line);
+        if (msg.type === "progress") paintProgress(msg);
+        else if (msg.type === "result") render(msg.data);
+        else if (msg.type === "error") throw new Error(msg.message);
+      }
+    }
+  } catch (err) {
+    if (err.name !== "AbortError") showError(err.message || "The calculation failed.");
+    $("progressPanel").hidden = true;
+    if (lastResult) $("results").hidden = false;
+  } finally {
+    controller = null;
+    $("go").textContent = "Calculate";
+    $("preview").disabled = false;
+    $("clear").disabled = false;
+  }
+}
+
+function paintProgress(msg) {
+  const elapsed = Math.max(0, Math.round((performance.now() - startedAt) / 1000));
+  if (!msg.total) {
+    $("progressLabel").textContent = "Starting…";
+    $("progressSub").textContent = elapsed + "s";
+    return;
+  }
+  const pct = msg.phase === "sum" ? 100 : Math.floor(msg.done * 100 / msg.total);
+  const width = Math.min(100, msg.done * 100 / msg.total);
+  $("progressLabel").textContent = pct + "% (" + fmt(msg.done) + " of " + fmt(msg.total) + " blocks)";
+  $("progressSub").textContent = msg.phase === "sum"
+    ? "Adding up fees…"
+    : fmt(msg.fetched) + " transactions fetched · " + elapsed + "s";
+  $("bar").style.width = width + "%";
+  $("progressBar").setAttribute("aria-valuenow", String(pct));
+}
+
+function ageText(ts) {
+  const seconds = Math.max(0, Math.floor(Date.now() / 1000) - ts);
+  if (seconds < 60) return seconds === 1 ? "1 sec ago" : seconds + " secs ago";
+  if (seconds < 3600) {
+    const minutes = Math.floor(seconds / 60);
+    return minutes === 1 ? "1 min ago" : minutes + " mins ago";
+  }
+  if (seconds < 86400) {
+    const hours = Math.floor(seconds / 3600);
+    return hours === 1 ? "1 hr ago" : hours + " hrs ago";
+  }
+  const days = Math.floor(seconds / 86400);
+  return days === 1 ? "1 day ago" : days + " days ago";
+}
+function ageTitle(ts) {
+  const date = new Date(ts * 1000);
+  const p = (n) => String(n).padStart(2, "0");
+  return date.getUTCFullYear() + "-" + p(date.getUTCMonth() + 1) + "-" + p(date.getUTCDate())
+    + " " + p(date.getUTCHours()) + ":" + p(date.getUTCMinutes()) + ":" + p(date.getUTCSeconds());
+}
+function shortHash(hash) { return hash.slice(0, 14) + "…"; }
+function shortAddr(addr) {
+  if (!addr) return "Contract Creation";
+  return addr.slice(0, 10) + "…" + addr.slice(-9);
+}
+function dirName(dir) { return dir === "in" ? "IN" : dir === "out" ? "OUT" : "SELF"; }
+
+function render(data) {
+  lastResult = data;
+  $("progressPanel").hidden = true;
+  $("results").hidden = false;
+  const full = $("fullPrecision").checked;
+  const dirLabel = data.direction === "out" ? "outgoing" : data.direction === "in" ? "incoming" : "all";
+  $("resultTitle").innerHTML = "Blocks " + fmt(data.startBlock) + "–" + fmt(data.endBlock)
+    + (data.demo ? '<span class="demo-flag">Sample data</span>' : "");
+  const seconds = (data.elapsedMs / 1000).toFixed(1);
+  $("resultMeta").textContent = shortAddr(data.address) + " · " + dirLabel + " · "
+    + (data.cached ? "Loaded from cache" : data.requests + " API calls")
+    + " · " + seconds + "s";
+  $("statCount").textContent = fmt(data.count);
+  $("statEth").textContent = data.feeExact + " ETH";
+  $("statWei").textContent = groupWei(data.feeWei);
+  $("sumNote").textContent = "Exact sum of gas price × gas used. Row fees match the Etherscan list, which drops digits after the 8th decimal. Hover a fee to see the full value. " + data.count + " transaction" + (data.count === 1 ? "" : "s") + ".";
+  const warn = $("warnings");
+  warn.innerHTML = "";
+  if (data.warnings && data.warnings.length) {
+    const box = document.createElement("div");
+    box.className = "warn";
+    box.innerHTML = "<strong>Check these before you trust the total</strong><ul>"
+      + data.warnings.map((item) => "<li>" + escapeHtml(item) + "</li>").join("") + "</ul>";
+    warn.appendChild(box);
+  }
+  $("maxTitle").textContent = "Highest fees" + (data.maxCount ? " · top " + data.maxCount : "");
+  $("minTitle").textContent = "Lowest fees" + (data.minCount ? " · top " + data.minCount : "");
+  $("maxTable").innerHTML = data.maxCount ? table(data.max, full) : "<p class='hint'>Max count is 0.</p>";
+  $("minTable").innerHTML = data.minCount ? table(data.min, full) : "<p class='hint'>Min count is 0.</p>";
+  $("maxTitle").hidden = !data.maxCount;
+  $("maxTable").hidden = !data.maxCount;
+  $("minTitle").hidden = !data.minCount;
+  $("minTable").hidden = !data.minCount;
+}
+
+function groupWei(text) {
+  const neg = text.startsWith("-");
+  const digits = neg ? text.slice(1) : text;
+  return (neg ? "-" : "") + digits.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
+function table(rows, full) {
+  if (!rows.length) return "<p class='hint'>No transactions in this range.</p>";
+  const body = rows.map((row) => {
+    const when = showDate ? ageTitle(row.timestamp) : ageText(row.timestamp);
+    const amount = full ? row.amountExact : row.amount;
+    const fee = full ? row.feeExact : row.fee;
+    const feeTitle = "Exact " + row.feeExact + " ETH\n" + groupWei(row.gasUsed) + " gas × " + groupWei(row.gasPrice) + " wei";
+    return "<tr class='" + (row.failed ? "failed" : "") + "'>"
+      + "<td><a href='https://etherscan.io/tx/" + row.hash + "' target='_blank' rel='noopener' title='" + row.hash + "'>" + shortHash(row.hash) + "</a> "
+      + "<button class='icon' type='button' data-copy='" + row.hash + "'>copy</button></td>"
+      + "<td><span class='badge' title='" + escapeHtml(row.methodTitle) + "'>" + escapeHtml(row.method) + "</span>"
+      + (row.failed ? "<span class='fail'>Failed</span>" : "") + "</td>"
+      + "<td><a href='https://etherscan.io/block/" + row.block + "' target='_blank' rel='noopener'>" + fmt(row.block) + "</a></td>"
+      + "<td class='age' data-ts='" + row.timestamp + "' title='" + ageTitle(row.timestamp) + "'>" + when + "</td>"
+      + "<td><a href='https://etherscan.io/address/" + row.from + "' target='_blank' rel='noopener' title='" + row.from + "'>" + shortAddr(row.from) + "</a></td>"
+      + "<td><span class='dir " + row.direction + "'>" + dirName(row.direction) + "</span></td>"
+      + "<td>" + (row.to
+          ? "<a href='https://etherscan.io/address/" + row.to + "' target='_blank' rel='noopener' title='" + row.to + "'>" + shortAddr(row.to) + "</a>"
+          : "Contract Creation") + "</td>"
+      + "<td class='num' title='Exact " + row.amountExact + "'>" + amount + "</td>"
+      + "<td class='num' title='" + feeTitle + "'>" + fee + "</td>"
+      + "</tr>";
+  }).join("");
+  return "<table><thead><tr>"
+    + "<th>Txn hash</th><th>Method</th><th>Block</th><th class='age-head'>Age</th><th>From</th><th></th><th>To</th>"
+    + "<th class='num'>Amount</th><th class='num'>Txn fee</th>"
+    + "</tr></thead><tbody>" + body + "</tbody></table>";
+}
+
+function escapeHtml(text) {
+  return String(text).replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+}
+
+document.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-copy]");
+  if (button) {
+    await navigator.clipboard.writeText(button.getAttribute("data-copy"));
+    const old = button.textContent;
+    button.textContent = "copied";
+    setTimeout(() => { button.textContent = old; }, 900);
+    return;
+  }
+  if (event.target.classList && event.target.classList.contains("age-head")) {
+    showDate = !showDate;
+    if (lastResult) render(lastResult);
+  }
+});
+
+setInterval(() => {
+  if (showDate || !lastResult) return;
+  for (const cell of document.querySelectorAll(".age")) {
+    cell.textContent = ageText(Number(cell.dataset.ts));
+  }
+}, 10000);
+
+function summaryText() {
+  const data = lastResult;
+  if (!data) return "";
+  const dir = data.direction === "out" ? "outgoing" : data.direction === "in" ? "incoming" : "all";
+  return [
+    "Address: " + data.address,
+    "Blocks: " + data.startBlock + " to " + data.endBlock,
+    "Direction: " + dir,
+    "Transactions: " + data.count,
+    "Exact fee ETH: " + data.feeExact,
+    "Exact fee wei: " + data.feeWei,
+  ].join("\n");
+}
+async function copySummary() {
+  if (!lastResult) return;
+  await navigator.clipboard.writeText(summaryText());
+  $("copySummary").textContent = "Copied";
+  setTimeout(() => { $("copySummary").textContent = "Copy summary"; }, 900);
+}
+function downloadCsv() {
+  if (!lastResult) return;
+  const header = ["section", "hash", "method", "block", "timestamp_utc", "from", "to", "direction", "amount_list", "amount_exact_eth", "fee_list", "fee_exact_eth", "fee_wei", "gas_used", "gas_price_wei", "failed"];
+  const lines = [header.join(",")];
+  const push = (section, row) => {
+    const cells = [section, row.hash, row.method, row.block, ageTitle(row.timestamp), row.from, row.to, row.direction, row.amount, row.amountExact.replace(" ETH", ""), row.fee, row.feeExact, row.feeWei, row.gasUsed, row.gasPrice, row.failed ? "1" : "0"];
+    lines.push(cells.map(csv).join(","));
+  };
+  for (const row of lastResult.max) push("max", row);
+  for (const row of lastResult.min) push("min", row);
+  lines.push(["summary", "", "", lastResult.startBlock, "", lastResult.address, "", lastResult.direction, "", lastResult.feeExact, "", lastResult.feeExact, lastResult.feeWei, "", "", lastResult.count].map(csv).join(","));
+  const blob = new Blob([lines.join("\n")], { type: "text/csv" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = "txn-fee-sum.csv";
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
+function csv(value) {
+  const text = String(value ?? "");
+  return /[",\n]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
+}
+</script>
+</body>
+</html>

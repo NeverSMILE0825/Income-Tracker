@@ -1,0 +1,14 @@
+---
+description: Push codebase updates to the Income-Tracker GitHub repo
+alwaysApply: true
+---
+
+# Push updates to GitHub
+
+Remote: `https://github.com/NeverSMILE0825/Income-Tracker.git` (`origin`).
+
+After a requested code change is finished, commit it and push to `origin`.
+
+- Include the files that belong to the change. Leave out `data/`, `*.db`, `.env`, and anything that holds an API key or the local transaction cache.
+- Do not force-push. Do not change git config.
+- If the turn only answered a question and did not change project files, do not commit.
