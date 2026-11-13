@@ -755,6 +755,10 @@ class Scanner:
 def aggregate(db: Database, address: str, start: int, end: int, direction: str, max_count: int, min_count: int) -> dict:
     total = 0
     count = 0
+    out_count = 0
+    in_count = 0
+    out_fee = 0
+    in_fee = 0
     max_heap: list[tuple] = []
     min_heap: list[tuple] = []
     seq = 0
@@ -764,11 +768,17 @@ def aggregate(db: Database, address: str, start: int, end: int, direction: str, 
             value_wei, gas_used, gas_price, fee_wei, method_id, function_name, is_error,
         ) = row
         way = _direction(address, from_addr, to_addr)
+        fee = int(fee_wei)
+        if way in ("out", "self"):
+            out_count += 1
+            out_fee += fee
+        if way in ("in", "self"):
+            in_count += 1
+            in_fee += fee
         if direction == "out" and way not in ("out", "self"):
             continue
         if direction == "in" and way not in ("in", "self"):
             continue
-        fee = int(fee_wei)
         count += 1
         total += fee
         record = _record(
@@ -786,6 +796,12 @@ def aggregate(db: Database, address: str, start: int, end: int, direction: str, 
         "count": count,
         "feeWei": str(total),
         "feeExact": format_exact(total),
+        "outCount": out_count,
+        "inCount": in_count,
+        "outFeeWei": str(out_fee),
+        "inFeeWei": str(in_fee),
+        "outFeeExact": format_exact(out_fee),
+        "inFeeExact": format_exact(in_fee),
         "max": highest,
         "min": lowest,
     }
@@ -1249,11 +1265,32 @@ def self_test() -> None:
     assert any(row["amount"] == "0.0₃3062 ETH" and row["method"] == "Deposit Ether" for row in summary["max"])
     assert any(row["method"] == "Swap Exact ETH For Tokens" for row in summary["max"])
     assert any(row["toLabel"] == "Contract Creation" for row in summary["max"])
+    out_n = in_n = out_fee = in_fee = 0
+    for tx in txs:
+        fee = tx["_fee"]
+        source = tx["from"].lower()
+        dest = tx["to"].lower()
+        if source == address:
+            out_n += 1
+            out_fee += fee
+        if dest == address:
+            in_n += 1
+            in_fee += fee
+    assert summary["outCount"] == out_n
+    assert summary["inCount"] == in_n
+    assert int(summary["outFeeWei"]) == out_fee
+    assert int(summary["inFeeWei"]) == in_fee
+    assert summary["outFeeExact"] == format_exact(out_fee)
+    assert summary["inFeeExact"] == format_exact(in_fee)
     outgoing = aggregate(db, address, start, end, "out", 1, 1)
     incoming = aggregate(db, address, start, end, "in", 1, 1)
     assert outgoing["count"] + incoming["count"] > summary["count"]  # self is in both
     assert outgoing["count"] < summary["count"]
     assert int(outgoing["feeWei"]) + int(incoming["feeWei"]) > int(summary["feeWei"])
+    assert outgoing["outCount"] == out_n and outgoing["inCount"] == in_n
+    assert incoming["outFeeWei"] == str(out_fee) and incoming["inFeeWei"] == str(in_fee)
+    assert outgoing["count"] == out_n and int(outgoing["feeWei"]) == out_fee
+    assert incoming["count"] == in_n and int(incoming["feeWei"]) == in_fee
 
     intervals2 = IntervalSet()
     intervals2.load(db.load_coverage(address))

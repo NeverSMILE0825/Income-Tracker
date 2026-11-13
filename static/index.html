@@ -98,9 +98,11 @@
   .track { height: 14px; border-radius: 999px; background: #efe7dc; overflow: hidden; border: 1px solid var(--line); }
   .bar { height: 100%; width: 0; background: linear-gradient(90deg, #c4552a, #8d3116); transition: width 0.2s linear; }
   .stats { display: grid; grid-template-columns: 180px 1fr 1fr; gap: 12px; }
+  .stats.dirs { grid-template-columns: 180px 1fr 180px 1fr; margin-top: 12px; }
   .stat { padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
   .stat b { display: block; margin-top: 4px; font-size: 22px; letter-spacing: -0.03em; font-weight: 650; font-variant-numeric: tabular-nums; word-break: break-all; }
   .stat em { font-style: normal; color: var(--muted); font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; }
+  .stat .wei { display: block; margin-top: 6px; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; word-break: break-all; }
   .result-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-end; margin-bottom: 12px; }
   .result-head h2 { margin: 0; font-size: 18px; }
   .meta { color: var(--muted); font-size: 13px; }
@@ -133,7 +135,7 @@
   .section-title { margin: 18px 0 8px; font-size: 16px; }
   .demo-flag { display: inline-block; margin-left: 8px; padding: 2px 8px; border-radius: 999px; background: var(--warn-bg); color: var(--out); font-size: 12px; }
   @media (max-width: 860px) {
-    .grid, .stats { grid-template-columns: 1fr; }
+    .grid, .stats, .stats.dirs { grid-template-columns: 1fr; }
     .span-2, .span-3 { grid-column: auto; }
   }
 </style>
@@ -230,6 +232,12 @@
       <div class="stat"><em>Transactions</em><b id="statCount">0</b></div>
       <div class="stat"><em>Exact fee sum</em><b id="statEth">0 ETH</b></div>
       <div class="stat"><em>Exact fee sum in wei</em><b id="statWei">0</b></div>
+    </div>
+    <div class="stats dirs">
+      <div class="stat"><em>Out tx count</em><b id="statOutCount">0</b></div>
+      <div class="stat"><em>Out fee total</em><b id="statOutFee">0 ETH</b><span class="wei" id="statOutWei">0 wei</span></div>
+      <div class="stat"><em>In tx count</em><b id="statInCount">0</b></div>
+      <div class="stat"><em>In fee total</em><b id="statInFee">0 ETH</b><span class="wei" id="statInWei">0 wei</span></div>
     </div>
     <p class="hint" id="sumNote"></p>
     <div id="warnings"></div>
@@ -453,7 +461,13 @@ function render(data) {
   $("statCount").textContent = fmt(data.count);
   $("statEth").textContent = data.feeExact + " ETH";
   $("statWei").textContent = groupWei(data.feeWei);
-  $("sumNote").textContent = "Exact sum of gas price × gas used. Row fees match the Etherscan list, which drops digits after the 8th decimal. Hover a fee to see the full value. " + data.count + " transaction" + (data.count === 1 ? "" : "s") + ".";
+  $("statOutCount").textContent = fmt(data.outCount);
+  $("statInCount").textContent = fmt(data.inCount);
+  $("statOutFee").textContent = data.outFeeExact + " ETH";
+  $("statInFee").textContent = data.inFeeExact + " ETH";
+  $("statOutWei").textContent = groupWei(data.outFeeWei) + " wei";
+  $("statInWei").textContent = groupWei(data.inFeeWei) + " wei";
+  $("sumNote").textContent = "Exact sum of gas price × gas used. Out totals are fees this address paid, including a send to itself. In totals are fees on transactions sent to this address, including a send to itself, and those fees were paid by the sender. A self-transfer is in both. Row fees match the Etherscan list, which drops digits after the 8th decimal. Hover a fee to see the full value. " + data.count + " transaction" + (data.count === 1 ? "" : "s") + " in this view.";
   const warn = $("warnings");
   warn.innerHTML = "";
   if (data.warnings && data.warnings.length) {
@@ -545,6 +559,12 @@ function summaryText() {
     "Transactions: " + data.count,
     "Exact fee ETH: " + data.feeExact,
     "Exact fee wei: " + data.feeWei,
+    "Out tx count: " + data.outCount,
+    "Out fee ETH: " + data.outFeeExact,
+    "Out fee wei: " + data.outFeeWei,
+    "In tx count: " + data.inCount,
+    "In fee ETH: " + data.inFeeExact,
+    "In fee wei: " + data.inFeeWei,
   ].join("\n");
 }
 async function copySummary() {
@@ -564,6 +584,8 @@ function downloadCsv() {
   for (const row of lastResult.max) push("max", row);
   for (const row of lastResult.min) push("min", row);
   lines.push(["summary", "", "", lastResult.startBlock, "", lastResult.address, "", lastResult.direction, "", lastResult.feeExact, "", lastResult.feeExact, lastResult.feeWei, "", "", lastResult.count].map(csv).join(","));
+  lines.push(["summary_out", "", "", lastResult.startBlock, "", lastResult.address, "", "out", "", lastResult.outFeeExact, "", lastResult.outFeeExact, lastResult.outFeeWei, "", "", lastResult.outCount].map(csv).join(","));
+  lines.push(["summary_in", "", "", lastResult.startBlock, "", lastResult.address, "", "in", "", lastResult.inFeeExact, "", lastResult.inFeeExact, lastResult.inFeeWei, "", "", lastResult.inCount].map(csv).join(","));
   const blob = new Blob([lines.join("\n")], { type: "text/csv" });
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
